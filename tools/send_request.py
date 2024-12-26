@@ -56,7 +56,7 @@ def check_endpoint(endpoint: str) -> None:
         "/api/v3/klines",
         "/api/v3/account",
     ]:
-        raise TypeError("Invalid endpoint")
+        raise TypeError(f"Invalid endpoint: {endpoint}")
 
 
 def match_endpoint(endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -158,7 +158,7 @@ def dispatch_request(http_method: str) -> Any:
         "DELETE": session.delete,
         "PUT": session.put,
         "POST": session.post,
-    }.get(http_method, "GET")
+    }.get(http_method)
 
 
 def send_signed_request(
@@ -175,15 +175,13 @@ def send_signed_request(
     Returns:
         Dict[str, Any]: The response from the API.
     """
-    query_string = urlencode(payload, True)
-    if query_string:
-        query_string = f"{query_string}&timestamp={get_timestamp()}"
+    query_str = urlencode(payload, True)
+    if query_str:
+        query_str = f"{query_str}&timestamp={get_timestamp()}"
     else:
-        query_string = f"timestamp={get_timestamp()}"
+        query_str = f"timestamp={get_timestamp()}"
 
-    url = (
-        BASE_URL + url_path + "?" + query_string + "&signature=" + hashing(query_string)
-    )
+    url = BASE_URL + url_path + "?" + query_str + "&signature=" + hashing(query_str)
     params = {"url": url, "params": {}}
     response = dispatch_request(http_method)(**params)
     return response.json()
@@ -200,9 +198,9 @@ def send_public_request(url_path: str, payload: Dict[str, Any] = {}) -> Dict[str
     Returns:
         Dict[str, Any]: The response from the API.
     """
-    query_string = urlencode(payload, True)
+    query_str = urlencode(payload, True)
     url = BASE_URL + url_path
-    if query_string:
-        url = url + "?" + query_string
+    if query_str:
+        url = url + "?" + query_str
     response = dispatch_request("GET")(url=url)
     return response.json()
