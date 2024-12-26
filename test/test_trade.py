@@ -5,7 +5,8 @@ sys.path.append("..")
 
 from tools.parse_transactions import select_transaction_parser
 from tools.send_request import send_signed_request, set_payload, get_endpoint
-from pprint import pprint
+from tools.get_account_info import get_account_info
+import pandas as pd
 
 ### ENDPOINTS ###
 
@@ -29,17 +30,22 @@ from pprint import pprint
 #   - Get withdraw history
 #   - Paramaters: startTime, endTime, status = 1
 
+tickers = list(get_account_info().index)
 transaction_type = "trade"
-endpoint = get_endpoint(transaction_type)
-params = set_payload(endpoint, symbol="WLDUSDC")
 transaction_parser = select_transaction_parser(transaction_type)
+endpoint = get_endpoint(transaction_type)
 
 
 def main():
 
     try:
-        response = send_signed_request("GET", endpoint, params)
-        pprint(transaction_parser(response))
+        df = pd.DataFrame()
+        for ticker in tickers:
+            for stabelcoin in ["USDT", "USDC"]:
+                params = set_payload(endpoint, symbol=ticker + stabelcoin)
+                response = send_signed_request("GET", endpoint, params)
+                df = pd.concat([df, pd.DataFrame(transaction_parser(response))])
+        df.to_csv(f"../trades.csv", index=False)
     except requests.exceptions.RequestException as e:
         print(f"Error pinging Binance API: {e}")
 
