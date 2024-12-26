@@ -3,7 +3,7 @@ from pprint import pprint
 import pandas as pd
 
 
-def get_account_info(date):
+def get_account_info():
     """
     Get account information from the Binance API.
 
