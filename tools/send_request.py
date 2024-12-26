@@ -54,6 +54,7 @@ def check_endpoint(endpoint: str) -> None:
         "/sapi/v1/convert/tradeFlow",
         "/sapi/v1/fiat/payments",
         "/api/v3/klines",
+        "/api/v3/account",
     ]:
         raise TypeError("Invalid endpoint")
 
@@ -99,6 +100,9 @@ def set_payload(endpoint: str, **kwargs: Any) -> Dict[str, Any]:
     """
     check_endpoint(endpoint)
     params: Dict[str, Any] = {}
+    if endpoint == "/api/v3/account":
+        params["omitZeroBalances"] = "true"
+        return params
     if endpoint != "/api/v3/myTrades":
         start, end = kwargs.get("start"), kwargs.get("end")
         if start is not None:
