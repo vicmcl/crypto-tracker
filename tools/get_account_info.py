@@ -1,5 +1,4 @@
 from tools.send_request import send_signed_request, set_payload
-from pprint import pprint
 import pandas as pd
 
 
