@@ -106,9 +106,11 @@ def set_payload(endpoint: str, **kwargs: Any) -> Dict[str, Any]:
     if endpoint != "/api/v3/myTrades":
         start, end = kwargs.get("start"), kwargs.get("end")
         if start is not None:
-            params["startTime"] = int(parser.parse(start).timestamp() * 1000)
+            params["startTime"] = int(
+                parser.parse(start, dayfirst=True).timestamp() * 1000
+            )
         if end is not None:
-            params["endTime"] = int(parser.parse(end).timestamp() * 1000)
+            params["endTime"] = int(parser.parse(end, dayfirst=True).timestamp() * 1000)
     params["symbol"] = kwargs.get("symbol")
     params = match_endpoint(endpoint, params)
     return params
