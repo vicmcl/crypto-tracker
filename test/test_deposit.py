@@ -1,57 +1,32 @@
 import sys
+import pandas as pd
 
 sys.path.append("..")
 
 from tools.send_request import send_signed_request, set_payload, get_endpoint
-from pprint import pprint
 from datetime import date
-from tools.parse_transactions import select_transaction_parser
+from tools.parse_transactions import transform_keys, parse_json, select_config
 from tools.moving_window import moving_window
-
-### ENDPOINTS ###
-
-# /api/v3/myTrades
-#   - Get trades for a specific account and symbol
-#   - Paramaters: symbol, startTime, endTime
-
-# /sapi/v1/fiat/payments
-#   - Get fiat payments
-#   - Paramaters: transactionType, beginTime, endTime
-
-# /sapi/v1/convert/tradeFlow
-#   - Get conversion trades
-#   - Paramaters: startTime, endTime
-
-# /sapi/v1/capital/deposit/hisrec
-#   - Get deposit history
-#   - Paramaters: startTime, endTime, includeSource = True, status = 1
-
-# /sapi/v1/capital/withdraw/history
-#   - Get withdraw history
-#   - Paramaters: startTime, endTime, status = 1
-
-transaction_type = "deposit"
-start = "July 1, 2023"
-end = date.today().isoformat()
-endpoint = get_endpoint(transaction_type)
-parser = select_transaction_parser(transaction_type)
 
 
 def main():
 
+    transaction_type = "deposit"
+    start = "01-07-2023"
+    end = date.today().strftime("%d-%m-%Y")
+    endpoint = get_endpoint(transaction_type)
+    key_config = select_config(transaction_type)
+    df = pd.DataFrame()
+
     if start is not None and end is not None:
         for window in moving_window(start, end):
-            dates = [date for date in window]
-            print()
-            print("=" * 20, dates[0], "to", dates[1], "=" * 20, end="\n\n")
-            params = set_payload(
-                endpoint,
-                start=window[0],
-                end=window[1],
-            )
+            params = set_payload(endpoint, start=window[0], end=window[1])
             response = send_signed_request("GET", endpoint, params)
-            # pprint(response)
-            pprint(parser(response))
+            transactions = parse_json(response, transaction_type)
+            filtered_transactions = transform_keys(transactions, key_config)
+            df = pd.concat([df, pd.DataFrame(filtered_transactions)])
+    df = df.sort_values(by="dt")
+    df.to_csv("../csv/deposit.csv", index=False)
 
 
 if __name__ == "__main__":

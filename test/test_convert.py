@@ -1,27 +1,32 @@
-import requests
 import sys
+import pandas as pd
 
 sys.path.append("..")
 
 from tools.send_request import send_signed_request, set_payload, get_endpoint
-from pprint import pprint
-from tools.parse_transactions import select_transaction_parser
-
-transaction_type = "convert"
-start = "19-12-2023"
-end = "18-01-2024"
-endpoint = get_endpoint(transaction_type)
-params = set_payload(endpoint, start=start, end=end)
-transaction_parser = select_transaction_parser(transaction_type)
+from tools.parse_transactions import transform_keys, select_config, parse_json
+from tools.moving_window import moving_window
+from datetime import date
 
 
 def main():
 
-    try:
-        response = send_signed_request("GET", endpoint, params)
-        pprint(transaction_parser(response))
-    except requests.exceptions.RequestException as e:
-        print(f"Error pinging Binance API: {e}")
+    transaction_type = "convert"
+    start = "01-07-2023"
+    end = date.today().strftime("%d-%m-%Y")
+    endpoint = get_endpoint(transaction_type)
+    key_config = select_config(transaction_type)
+    df = pd.DataFrame()
+
+    if start is not None and end is not None:
+        for window in moving_window(start, end):
+            params = set_payload(endpoint, start=window[0], end=window[1])
+            response = send_signed_request("GET", endpoint, params)
+            transactions = parse_json(response, transaction_type)
+            filtered_transactions = transform_keys(transactions, key_config)
+            df = pd.concat([df, pd.DataFrame(filtered_transactions)])
+    df = df.sort_values(by="dt")
+    df.to_csv("../csv/convert.csv", index=False)
 
 
 if __name__ == "__main__":
