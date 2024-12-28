@@ -1,11 +1,11 @@
 import json
 from datetime import datetime
-from functools import partial
 from pathlib import Path
 from tools.send_request import send_public_request, set_payload
+from pprint import pprint
 
 
-def safe_get(data: dict, dot_chained_keys: str):
+def _safe_get(data: dict, dot_chained_keys: str):
     """
     Safely retrieve a value from a nested dictionary using dot-separated keys.
 
@@ -46,7 +46,7 @@ def get_usdt_price(symbol, start):
     return avg_price
 
 
-def readable_datetime(timestamp):
+def _readable_datetime(timestamp):
     """
     Convert a timestamp to a readable datetime string.
 
@@ -56,6 +56,8 @@ def readable_datetime(timestamp):
     Returns:
         str: The readable datetime string.
     """
+    if isinstance(timestamp, str):
+        return timestamp
     return str(datetime.fromtimestamp(timestamp / 1000)).split(".")[0]
 
 
@@ -82,7 +84,7 @@ def add_usd_value(query):
     return query
 
 
-def parse_json(transactions, config):
+def parse_json(transactions, transaction_type):
     """
     Parse JSON transactions based on the transaction type.
 
@@ -93,40 +95,16 @@ def parse_json(transactions, config):
     Returns:
         list: The list of transactions.
     """
-    if config["transaction_type"] == "convert":
-        transactions = safe_get(transactions, "list") or []
-    elif config["transaction_type"] == "fiat":
-        transactions = safe_get(transactions, "data") or []
-    return transactions
+    if transaction_type == "convert":
+        extracted_transactions = _safe_get(transactions, "list") or []
+    elif transaction_type == "fiat":
+        extracted_transactions = _safe_get(transactions, "data") or []
+    else:
+        extracted_transactions = transactions
+    return extracted_transactions
 
 
-def parse_transactions(transactions, config):
-    """
-    Parse transactions and convert them into a list of queries.
-
-    Args:
-        transactions (dict): The transactions data.
-        config (dict): The configuration dictionary for the transaction type.
-
-    Returns:
-        list: The list of parsed queries.
-    """
-    queries = []
-    transactions_found = parse_json(transactions=transactions, config=config)
-    for t in transactions_found:
-        vals = [safe_get(t, key) for key in config["response_keys"]]
-        if None in vals:
-            continue
-        query = {key: val for key, val in zip(config["keys"], vals)}
-        query["transaction"] = config["transaction_type"]
-        query["dt"] = readable_datetime(query["dt"])
-        if config["transaction_type"] in ["convert", "trade"]:
-            query = add_usd_value(query)
-        queries.append(query)
-    return queries
-
-
-def select_transaction_parser(transaction_type):
+def select_config(transaction_type):
     """
     Select the appropriate transaction parser based on the transaction type.
 
@@ -136,10 +114,57 @@ def select_transaction_parser(transaction_type):
     Returns:
         function: A partial function for parsing transactions with the specified configuration.
     """
+    # Construct path to config file relative to this script
     json_path = Path(__file__).parent / "transaction_configs.json"
-    with open(json_path, "r") as f:
-        transaction_configs = json.load(f)
-    config = transaction_configs.get(transaction_type)
-    if config:
-        return partial(parse_transactions, config=config)
-    return None
+
+    # Check if config file exists
+    if not json_path.exists():
+        raise FileNotFoundError(f"File not found: {json_path}")
+
+    try:
+        # Open and parse the JSON config file
+        with open(json_path, "r") as config_file:
+            config = json.load(config_file).get(transaction_type)
+    except json.JSONDecodeError as e:
+        # Handle JSON parsing errors
+        raise ValueError(f"Error decoding JSON from {json_path}: {e}")
+
+    # Ensure config exists for the requested transaction type
+    if config is None:
+        raise ValueError(f"No configuration found for {transaction_type}.")
+
+    return config
+
+
+def transform_keys(transactions, config):
+    """
+    Transform transaction keys based on the configuration.
+
+    Args:
+        transactions (list): The list of transactions.
+        config (dict): The configuration dictionary for the transaction type.
+
+    Returns:
+        list: The list of transformed transactions.
+    """
+    converted_transactions_data = []
+    # Iterate through each transaction in the transactions list
+    for transaction in transactions:
+        # Create pairs of keys from config using zip
+        key_pairs = zip(config["keys"], config["response_keys"])
+        # Transform each response key to a new key to unify the format
+        data = {
+            key: (
+                # If key contains "time", convert timestamp to readable datetime
+                transaction[response_key]
+                if "time" not in response_key.lower()
+                else _readable_datetime(transaction[response_key])
+            )
+            for key, response_key in key_pairs
+        }
+        # Special handling for trade type transactions to set buy/sell side
+        if "isBuyer" in transaction:
+            data["side"] = "BUY" if transaction["isBuyer"] else "SELL"
+        # Add the transformed transaction to the result list
+        converted_transactions_data.append(data)
+    return converted_transactions_data
