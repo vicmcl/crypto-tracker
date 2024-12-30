@@ -9,23 +9,45 @@ from tools.moving_window import moving_window
 from datetime import date
 
 
-def main():
+def fetch_transactions(endpoint, start_date, end_date, side, transaction_type):
+    params = set_payload(endpoint, start=start_date, end=end_date, side=side)
+    response = send_signed_request("GET", endpoint, params)
+    return parse_json(response, transaction_type=transaction_type)
 
-    transaction_type = "fiat"
-    start = "01-07-2023"
-    end = date.today().strftime("%d-%m-%Y")
+
+def process_transactions(transactions, key_config, side):
+    if not transactions:
+        return pd.DataFrame()
+    df = pd.DataFrame(transform_keys(transactions, key_config))
+    df["side"] = "BUY" if not side else "SELL"
+    return df
+
+
+def fetch_all_transactions(start, end, transaction_type):
     endpoint = get_endpoint(transaction_type)
     key_config = select_config(transaction_type)
     df = pd.DataFrame()
 
-    if start is not None and end is not None:
-        for window in moving_window(start, end):
-            params = set_payload(endpoint, start=window[0], end=window[1])
-            response = send_signed_request("GET", endpoint, params)
-            transactions = parse_json(response, transaction_type)
-            filtered_transactions = transform_keys(transactions, key_config)
-            df = pd.concat([df, pd.DataFrame(filtered_transactions)])
-    df = df.sort_values(by="dt")
+    for side in range(2):
+        for window_start, window_end in moving_window(start, end):
+            transactions = fetch_transactions(
+                endpoint,
+                window_start,
+                window_end,
+                side,
+                transaction_type,
+            )
+            partial_df = process_transactions(transactions, key_config, side)
+            df = pd.concat([df, partial_df])
+
+    return df.sort_values(by="dt") if not df.empty else df
+
+
+def main():
+    transaction_type = "fiat"
+    start = "01-07-2023"
+    end = date.today().strftime("%d-%m-%Y")
+    df = fetch_all_transactions(start, end, transaction_type)
     df.to_csv("../csv/fiat.csv", index=False)
 
 
