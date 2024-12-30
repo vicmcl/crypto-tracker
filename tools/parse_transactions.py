@@ -1,8 +1,6 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from tools.send_request import send_public_request, set_payload
-from pprint import pprint
 
 
 def _safe_get(data: dict, dot_chained_keys: str):
@@ -28,24 +26,6 @@ def _safe_get(data: dict, dot_chained_keys: str):
     return data
 
 
-def get_usdt_price(symbol, start):
-    """
-    Get the average USDT price for a given symbol and start time.
-
-    Args:
-        symbol (str): The symbol for which to get the price.
-        start (int): The start time in milliseconds.
-
-    Returns:
-        float: The average price.
-    """
-    endpoint = "/api/v3/klines"
-    params = set_payload(endpoint, symbol=symbol, start=start)
-    response = send_public_request(endpoint, params)
-    avg_price = round((float(response[0][2]) + float(response[0][3])) / 2, 2)
-    return avg_price
-
-
 def _readable_datetime(timestamp):
     """
     Convert a timestamp to a readable datetime string.
@@ -61,29 +41,6 @@ def _readable_datetime(timestamp):
     return str(datetime.fromtimestamp(timestamp / 1000)).split(".")[0]
 
 
-def add_usd_value(query):
-    """
-    Add the USD value to a query based on from_coin and to_coin keys.
-
-    Args:
-        query (dict): The query dictionary containing transaction details.
-
-    Returns:
-        dict: The updated query dictionary with the USD value added.
-    """
-    if "USD" not in query["from_coin"] and "USD" not in query["to_coin"]:
-        query["value_usd"] = round(
-            get_usdt_price(symbol=query["to_coin"] + "USDT", start=query["dt"])
-            * float(query["to_amount"]),
-            2,
-        )
-    elif query["to_coin"].startswith("USD"):
-        query["value_usd"] = round(float(query["to_amount"]), 2)
-    else:
-        query["value_usd"] = round(float(query["from_amount"]), 2)
-    return query
-
-
 def parse_json(transactions, transaction_type):
     """
     Parse JSON transactions based on the transaction type.
@@ -96,12 +53,13 @@ def parse_json(transactions, transaction_type):
         list: The list of transactions.
     """
     if transaction_type == "convert":
-        extracted_transactions = _safe_get(transactions, "list") or []
+        extract_transactions = _safe_get(transactions, "list") or []
     elif transaction_type == "fiat":
-        extracted_transactions = _safe_get(transactions, "data") or []
+        all_transactions = _safe_get(transactions, "data") or []
+        extract_transactions = [t for t in all_transactions if t["status"] != "Failed"]
     else:
-        extracted_transactions = transactions
-    return extracted_transactions
+        extract_transactions = transactions
+    return extract_transactions
 
 
 def select_config(transaction_type):
