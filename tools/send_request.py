@@ -72,7 +72,6 @@ def match_endpoint(endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
     """
     match endpoint:
         case "/sapi/v1/fiat/payments":
-            params["transactionType"] = 0
             params["beginTime"] = params.pop("startTime")
         case "/sapi/v1/capital/deposit/hisrec":
             params["includeSource"] = (True,)
@@ -80,7 +79,7 @@ def match_endpoint(endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
         case "/sapi/v1/capital/withdraw/history":
             params["status"] = 6
         case "/api/v3/klines":
-            params["interval"] = "1m"
+            params["interval"] = "1s"
             params["limit"] = 1
         case _:
             pass
@@ -103,7 +102,7 @@ def set_payload(endpoint: str, **kwargs: Any) -> Dict[str, Any]:
     if endpoint == "/api/v3/account":
         params["omitZeroBalances"] = "true"
         return params
-    if endpoint != "/api/v3/myTrades":
+    elif endpoint != "/api/v3/myTrades":
         start, end = kwargs.get("start"), kwargs.get("end")
         if start is not None:
             params["startTime"] = int(
@@ -111,6 +110,8 @@ def set_payload(endpoint: str, **kwargs: Any) -> Dict[str, Any]:
             )
         if end is not None:
             params["endTime"] = int(parser.parse(end, dayfirst=True).timestamp() * 1000)
+        if endpoint == "/sapi/v1/fiat/payments":
+            params["transactionType"] = kwargs.get("side")
     params["symbol"] = kwargs.get("symbol")
     params = match_endpoint(endpoint, params)
     return params
