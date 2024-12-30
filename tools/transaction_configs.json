@@ -5,15 +5,14 @@
         ],
         "keys": [
             "id", "dt", "from_amount", "from_asset", "to_amount", "to_asset"
-        ],
-        "transaction_type": "convert"
+        ]
     },
     "deposit": {
         "response_keys": [
             "id", "insertTime", "amount", "coin", "address", "sourceAddress"
         ],
         "keys": [
-            "id", "dt", "to_amount", "to_coin", "to_address", "from_address"
+            "id", "dt", "to_amount", "to_asset", "to_address", "from_address"
         ]
     },
     "withdraw": {
@@ -21,15 +20,15 @@
             "txId", "completeTime", "coin", "amount", "transactionFee", "address"
         ],
         "keys": [
-            "id", "dt", "asset", "amount", "fee", "address"
+            "id", "dt", "from_asset", "from_amount", "fee", "to_address"
         ]
     },
     "fiat": {
         "response_keys": [
-            "orderNo", "createTime", "obtainAmount", "cryptoCurrency", "fiatCurrency", "sourceAmount", "price", "totalFee"
+            "orderNo", "createTime", "status", "obtainAmount", "cryptoCurrency", "fiatCurrency", "sourceAmount", "price", "totalFee"
         ],
         "keys": [
-            "id", "dt", "to_amount", "to_coin", "from_coin", "from_amount", "price", "fee_cost"
+            "id", "dt", "status", "to_amount", "to_asset", "from_asset", "from_amount", "price", "fee_cost"
         ]
     },
     "trade": {
